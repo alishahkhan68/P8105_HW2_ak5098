@@ -7,7 +7,110 @@ date: "2024-10-02"
 ## Homework 2
 
 ```{r}
+library(tidyverse)
+library(dplyr)
+library(readr)
+library(readxl)
 
+subway = read_csv(file = "NYC_Transit_Subway_Entrance_And_Exit_Data.csv",
+                  col_types = cols(
+                    Route8=col_character(),
+                    Route9=col_character(),
+                    Route10=col_character(),
+                    Route11=col_character()))
+```
+```{r}
+#Problem 1
+subway = janitor::clean_names(subway)
+
+subway_tidy = select(subway, line, station_name, station_latitude, station_longitude, starts_with("route"), entrance_type, entry, vending, ada)
+
+subway_tidy %>% mutate(entry = case_match(entry,
+  "YES" ~ TRUE, "NO" ~ FALSE, .default=NA))
+```
+## The dataset contains information about the station's name, exact location, route, entrance type and usability, vending and ADA accessibility. The dimensions are 1868x19. So far, I have only taken some cleaning steps. I have converted the names of the columns into more coding-friendly names, I have selected the columns I am interested in, and I have changed one column from a character column to logical. However, I have not yet removed missing values. I have also not changed other character columns to logical (when they could be converted). For these reasons, the data is not yet tidy. 
+
+
+```{r}
+distinct_station = distinct(subway, station_name)
+nrows(distinct_station)
+
+#356 distinct stations
+
+distinct_station_ada = distinct(subway, station_name, entrance_type, ada, .keep_all = TRUE)
+filter(distinct_station_ada, ada==TRUE) %>% print()
+
+#137 ADA-compliant stations
+
+no_vending = select(subway, station_name, entrance_type, vending, entry) %>% distinct(station_name, .keep_all=TRUE)  %>%  filter(vending=="NO", entry=="YES")
+#9 station entrances/exits without vending
+#5 station entrances/exits without vending allow entry
+#proportion: 5/9 or 55.55% of stations entrances/exits without vending allow entry 
+  
+  
+subway_pivot =  pivot_longer(
+  subway,
+  cols = starts_with("route"),
+  names_to="route_number",
+  values_to = "route_name",
+  names_prefix = "route"
+)
+
+#Of the stations that serve A train, how many are ADA compliant?
+subway_A = distinct(subway_pivot, station_name, route_name, .keep_all = TRUE) %>% filter(!is.na(route_name))
+subway_A %>%  filter(route_name == "A") #56 unique stations that serve A train
+subway_A %>%  filter(route_name == "A", ada==TRUE) #15 unique stations that serve A train and are ADA compliant
+#15/56 or 26.79% of stations that serve the A train are ADA compliant
+```
+
+```{r}
+#####PROBLEM 2
+#tidying datasets
+mrtrashwheel = read_excel("202409 Trash Wheel Collection Data.xlsx", 
+                          sheet = "Mr. Trash Wheel", 
+                          na = c("NA", "", "."))
+mrtrashwheel_tidy = janitor::clean_names(mrtrashwheel)
+mrtrashwheel_tidy = mrtrashwheel_tidy %>% mutate(sports_balls = as.integer(round(sports_balls, 0)))
+mrtrashwheel_tidy = select(mrtrashwheel_tidy, -month, -year, -homes_powered, -x15, -x16) %>% drop_na() %>%  mutate(trashwheel="Mr Trash Wheel") 
+
+professortrashwheel = read_excel("202409 Trash Wheel Collection Data.xlsx", 
+                                 sheet = "Professor Trash Wheel",  
+                                 na = c("NA", "", "."))
+professortrashwheel_tidy = janitor::clean_names(professortrashwheel)
+professortrashwheel_tidy = select(professortrashwheel_tidy, -month, -year, -homes_powered) %>% drop_na() %>% mutate(trashwheel="Professor Trash Wheel")
+
+gwynnda = read_excel("202409 Trash Wheel Collection Data.xlsx", sheet = "Gwynnda Trash Wheel",  na = c("NA", "", ".")) 
+gwynnda_tidy = janitor::clean_names(gwynnda)
+gwynnda_tidy = select(gwynnda_tidy, -month, -year, -homes_powered) %>% drop_na() %>% mutate(trashwheel="Gwynnda")
+
+#combining datasets
+
+trashwheel_binded = bind_rows(mrtrashwheel_tidy, professortrashwheel_tidy, gwynnda_tidy, .id = "dumpster")
+```
+
+## Data Summary
+This dataset contains information about each of the 117 dumpsters, including the date of the assessment, the weight and volume of the trash, and the contents of the trash. Trash is separated into categories of plastic bottles, polystyrene, cigarette butts, glass bottles, plastic bags, sports balls, and wrappers. 
+
+
+```{r}
+##PROBLEM 3
+bakers = read_csv(file = "bakers.csv", na = c("NA", "", "."))
+bakes = read_csv(file = "bakes.csv", na = c("NA", "", "."))
+results = read_csv(file = "results.csv", na = c("NA", "", "."))
+viewers = read_csv(file = "viewers.csv", na = c("NA", "", "."))
+
+bakers_tidy = bakers %>% janitor::clean_names() %>% separate(baker_name, into = c("baker", "last_name"), sep = " ") %>% drop_na()
+bakes_tidy = bakes %>%janitor::clean_names() %>% drop_na()
+results_tidy = results %>%janitor::clean_names() %>% drop_na() %>% slice(-1:-2) %>%  rename(baker = x3, technical = x4, episode = x2, series = x1)
+
+merged_bakers = inner_join(bakers_tidy, bakes_tidy,results_tidy, by = "baker")
+merged_bakers = distinct(merged_bakers, baker, .keep_all = TRUE)
+
+
+head(viewers)
+viewers %>% janitor::clean_names()
+mean(as.numeric(viewers$`Series 5`))
 
 
 ```
+mean is 10.0393
